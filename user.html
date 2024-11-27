@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>バトルロイヤル ユーザ登録</title>
+    <link rel="stylesheet" href="user.css">
+</head>
+
+<body>
+    <div class="battle-container">
+        <h2>バトルロイヤルの世界へ！</h2>
+        <p class="intro">戦闘に参加するため、あなたの名前を登録しよう！</p>
+        <form action="user.php" method="post" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="name">ユーザ名 <span class="required"></span></label>
+                <input type="text" name="name" id="name" class="form-control" required placeholder="戦士名を入力">
+            </div>
+            <button type="submit" class="btn-submit">戦いに挑む！</button>
+        </form>
+    </div>
+</body>
+
+</html>

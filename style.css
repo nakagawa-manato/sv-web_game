@@ -1,0 +1,215 @@
+/*  全体設定 */
+body {
+    align-items: flex-start;
+    height: 100vh;
+    width: 90%;
+    max-width: 1200px;
+    /* 最大幅を指定 */
+    margin-top: 20px;
+    /* 上部の余白 */
+    background-color: #f0f0f0;
+    font-family: Arial, sans-serif;
+}
+
+/* コンテナ */
+.container {
+    display: flex;
+    /* 横並び */
+    justify-content: space-between;
+    /* 配置の間隔 */
+    gap: 20px;
+    /* 要素間の隙間を追加 */
+    align-items: flex-start;
+    /* 上揃え */
+    margin: 0 auto;
+    /* センタリング */
+    width: 100%;
+    /* 画面幅全体を使用 */
+}
+
+/*  盤面設定 */
+.board {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(7, 1fr);
+    gap: 1px;
+    width: 400px;
+    /* 盤面の幅 */
+    height: 350px;
+    /* 盤面の高さ */
+    border: 1px solid white;
+    flex-grow: 1;
+    /* ボードを中央に配置するための拡張 */
+}
+
+/*  各セル設定 */
+.cell {
+    background-color: green;
+    /* マスの色 */
+    border: 1px solid white;
+    /* 各マスの線の色 */
+}
+
+/* 移動可能なセルに光らせる効果 */
+.cell.moveable {
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    background-color: lightgreen;
+    /* 移動可能セルの色 */
+    box-shadow: 0 0 10px 2px rgba(0, 255, 0, 0.5);
+    /* 輝く効果 */
+}
+
+/* プレイヤーの座標を黄色に変更 */
+.cell.highlight {
+    background-color: yellow;
+    /* プレイヤーがいるセルの色 */
+}
+
+/* 危険エリアの赤色設定*/
+.cell.danger {
+    background-color: red !important;
+}
+
+/*  ログ表示エリア */
+.log {
+    width: 300px;
+    /* ログエリアの幅 */
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+/*  ログエリア見出し */
+.log h2 {
+    margin-top: 0;
+}
+
+/*  ログ各項目 */
+.log p {
+    margin-bottom: 5px;
+}
+
+h1 {
+    font-size: 2rem;
+    margin-bottom: 20px;
+}
+
+/* インベントリの格子レイアウト */
+.inventory {
+    display: grid;
+    grid-template-columns: repeat(7, 60px);
+    /* 7列 */
+    grid-template-rows: repeat(12, 60px);
+    /* 12行 */
+    gap: 3px;
+    /* マス目間の隙間 */
+    justify-content: center;
+    /* 横方向の中央揃え */
+    margin: 0 auto;
+    width: 250px;
+    /* インベントリの幅 */
+    flex-shrink: 0;
+    /* 横幅を縮小しない */
+}
+
+/* 各インベントリセル */
+.inventory-cell {
+    width: 60px;
+    height: 60px;
+    border: 1px solid #ccc;
+    /* セルの境界線 */
+    display: flex;
+    align-items: center;
+    /* 縦方向の中央揃え */
+    justify-content: center;
+    /* 横方向の中央揃え */
+    background-color: #f9f9f9;
+    cursor: pointer;
+}
+
+.inventory-cell:hover {
+    background-color: #e0e0e0;
+    /* ホバー時の背景色 */
+}
+
+/* インベントリセル */
+.inventory-cell img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+/* ポップアップのスタイル */
+.popup {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: none;
+    justify-content: center;
+    align-items: center;
+}
+
+.popup>p {
+    background-color: #fff;
+    padding: 20px;
+    font-size: 1.2rem;
+    text-align: center;
+    margin: 0;
+}
+
+button {
+    padding: 10px 20px;
+    font-size: 1rem;
+    margin-top: 10px;
+    cursor: pointer;
+}
+
+button#close-popup-btn {
+    background-color: #ccc;
+}
+
+button#use-item-btn {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.attack-button {
+    background-color: #ff5733;
+    /* 鮮やかなオレンジ色 */
+    color: white;
+    /* 白い文字 */
+    font-size: 18px;
+    /* フォントサイズ */
+    font-weight: bold;
+    /* 太字 */
+    padding: 15px 30px;
+    /* ボタンの余白 */
+    border-radius: 50px;
+    /* 丸い角 */
+    border: none;
+    /* 枠線なし */
+    cursor: pointer;
+    /* マウスオーバー時にカーソルが変わる */
+    transition: all 0.3s ease;
+    /* アニメーション効果 */
+}
+
+.attack-button:hover {
+    background-color: #e74c3c;
+    /* マウスオーバー時の色 */
+    transform: scale(1.1);
+    /* ホバー時にボタンが少し大きくなる */
+}
+
+.attack-button:active {
+    background-color: #c0392b;
+    /* クリック時の色 */
+    transform: scale(0.95);
+    /* クリック時に少し小さくなる */
+}
