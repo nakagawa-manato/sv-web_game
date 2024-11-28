@@ -16,10 +16,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // 作成した部屋のIDを取得
     $stmt = $db->prepare('SELECT room_id FROM rooms WHERE room_name = ?');
     $stmt->execute(array($room_name));
-    $room_id = $stmt;
+    $room_id = $stmt->fetch();
+
+    var_dump($room_id);
 
     // 部屋作成後にリダイレクト
-    header('Location: room_detail.php?room_id=' . $room_id);
+    header('Location: create_room_detail.php?room_id=' . $room_id['room_id']);
     exit;
 }
 
