@@ -2,29 +2,27 @@
 session_start();
 require('../../../conf/dbconnect.php');
 
-date_default_timezone_set('Asia/Tokyo');
-$time_now = date("s");
-
-echo $time_now;
-
 //プレイヤーidをセッションから取得
 $pl_id = $_SESSION['id'] ?? null;
 
 // room_idを取得
 $stmt = $db->prepare('SELECT room_id FROM player WHERE pl_id = ?');
 $stmt->execute(array($pl_id));
-$room_id = $stmt->fetch();
+$room = $stmt->fetch();
+$room_id = $room['room_id'];
 
-// 時間を取得
+// 初期のタイマー値を取得
 $stmt = $db->prepare('SELECT timer FROM timer WHERE room_id = ?');
-$stmt->execute(array($room_id['room_id']));
-$timer = $stmt->fetch();
+$stmt->execute(array($room_id));
+$timer_row = $stmt->fetch();
 
-var_dump($timer);
-
-//バックグラウンドで時間を管理(仮)
-$cmd = 'nohup php timer.php ' . $timer .'> /dev/null &';
-exec($cmd);
+// セルIDの定義（A1, B1, C1, ...）
+$cell_ids = [];
+for ($row = 1; $row <= 7; $row++) {
+    for ($col = 'A'; $col <= 'H'; $col++) {
+        $cell_ids[] = $col . $row; // A1, B1, ..., H7を生成
+    }
+}
 
 //プレイヤー座標を取得
 $pl_pos = $db->prepare('SELECT pos FROM player WHERE pl_id = ?');
@@ -61,7 +59,7 @@ try {
 try {
     //armory_posの情報を取得
     $stmt = $db->prepare('SELECT armory_pos FROM armory WHERE room_id = ?');
-    $stmt->execute(array($room_id['room_id']));
+    $stmt->execute(array($room_id));
     $armory_pos = $stmt->fetchALL(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     echo '接続エラー: ' . $e->getMessage();
@@ -70,7 +68,7 @@ try {
 try {
     //hos_posの情報を取得
     $stmt = $db->prepare('SELECT hos_pos FROM hospital WHERE room_id = ?');
-    $stmt->execute(array($room_id['room_id']));
+    $stmt->execute(array($room_id));
     $hospital_pos = $stmt->fetchALL(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     echo '接続エラー: ' . $e->getMessage();
@@ -79,7 +77,7 @@ try {
 // 隣接するプレイヤーの位置を取得
 $adjacentPlayers = [];
 $stmt = $db->prepare('SELECT pl_id, pos FROM player WHERE pl_id != ? AND room_id = ?');
-$stmt->execute(array($pl_id, $room_id['room_id']));
+$stmt->execute(array($pl_id, $room_id));
 $players = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 foreach ($players as $player) {
@@ -99,8 +97,8 @@ try {
     $randomY = $rows[array_rand($rows)]; //縦軸をランダムに選択
     $area = $randomX . $randomY;
 
-    $stmt = $db->prepare('INSERT INTO danger (area,num,room_id) VALUE (?, 0, ?)');
-    $stmt->execute(array($area, $room_id['room_id']));
+    $stmt = $db->prepare('INSERT INTO danger (area,num,room_id) VALUES (?, 0, ?)');
+    $stmt->execute(array($area, $room_id));
 } catch (PDOException $e) {
     echo '接続エラー: ' . $e->getMessage();
 }
@@ -108,7 +106,7 @@ try {
 try {
     //登録したdangerエリアをすべて取得
     $stmt = $db->prepare('SELECT area FROM danger WHERE num = 0 AND room_id = ?');
-    $stmt->execute(array($room_id['room_id']));
+    $stmt->execute(array($room_id));
     $dangerAreas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     echo '接続エラー:' . $e->getMessage();
@@ -139,77 +137,38 @@ $dangerCellsJson = json_encode($dangerCells);
         <form id="cellForm" action="cellform.php" method="POST">
             <input type="hidden" name="cellId" id="cellId">
             <div class="board">
-                <!-- 56マスの生成 -->
-                <div class="cell" id="A1"></div>
-                <div class="cell" id="B1"></div>
-                <div class="cell" id="C1"></div>
-                <div class="cell" id="D1"></div>
-                <div class="cell" id="E1"></div>
-                <div class="cell" id="F1"></div>
-                <div class="cell" id="G1"></div>
-                <div class="cell" id="H1"></div>
-                <div class="cell" id="A2"></div>
-                <div class="cell" id="B2"></div>
-                <div class="cell" id="C2"></div>
-                <div class="cell" id="D2"></div>
-                <div class="cell" id="E2"></div>
-                <div class="cell" id="F2"></div>
-                <div class="cell" id="G2"></div>
-                <div class="cell" id="H2"></div>
-                <div class="cell" id="A3"></div>
-                <div class="cell" id="B3"></div>
-                <div class="cell" id="C3"></div>
-                <div class="cell" id="D3"></div>
-                <div class="cell" id="E3"></div>
-                <div class="cell" id="F3"></div>
-                <div class="cell" id="G3"></div>
-                <div class="cell" id="H3"></div>
-                <div class="cell" id="A4"></div>
-                <div class="cell" id="B4"></div>
-                <div class="cell" id="C4"></div>
-                <div class="cell" id="D4"></div>
-                <div class="cell" id="E4"></div>
-                <div class="cell" id="F4"></div>
-                <div class="cell" id="G4"></div>
-                <div class="cell" id="H4"></div>
-                <div class="cell" id="A5"></div>
-                <div class="cell" id="B5"></div>
-                <div class="cell" id="C5"></div>
-                <div class="cell" id="D5"></div>
-                <div class="cell" id="E5"></div>
-                <div class="cell" id="F5"></div>
-                <div class="cell" id="G5"></div>
-                <div class="cell" id="H5"></div>
-                <div class="cell" id="A6"></div>
-                <div class="cell" id="B6"></div>
-                <div class="cell" id="C6"></div>
-                <div class="cell" id="D6"></div>
-                <div class="cell" id="E6"></div>
-                <div class="cell" id="F6"></div>
-                <div class="cell" id="G6"></div>
-                <div class="cell" id="H6"></div>
-                <div class="cell" id="A7"></div>
-                <div class="cell" id="B7"></div>
-                <div class="cell" id="C7"></div>
-                <div class="cell" id="D7"></div>
-                <div class="cell" id="E7"></div>
-                <div class="cell" id="F7"></div>
-                <div class="cell" id="G7"></div>
-                <div class="cell" id="H7"></div>
 
-                <!-- マップ格子にarmory_posの画像を埋め込む -->
-                <?php foreach ($armory_pos as $armory_Pos): ?>
-                    <div class="aromory-cell" aromory_cell_id="<?php echo htmlspecialchars($armory_Pos); ?>">
-                        <img src="./root_ico/armory.png" alt="armory_ico">
-                    </div>
-                <?php endforeach; ?>
+            <?php
+            // 56セルを生成
+            foreach ($cell_ids as $cell_id) {
+                // armory_posに含まれている座標かどうかを確認
+                $armory_class = in_array($cell_id, $armory_pos) ? 'armory_cell' : '';
+                // hospital_posに含まれている座標かどうかを確認
+                $hospital_class = in_array($cell_id, $hospital_pos) ? 'hospital_cell' : '';
+                
+                // armory_cellとhospital_cellのクラスを追加
+                $class = trim($armory_class . ' ' . $hospital_class); // クラス名を結合
 
-                <!-- マップ格子にhospital_posの画像を埋め込む -->
-                <?php foreach ($hospital_pos as $hospital_Pos): ?>
-                    <div class="hospital-cell" data-item-id="<?php echo htmlspecialchars($hospital_Pos); ?>">
-                        <img src="./root_ico/hospital.png" alt="hospital_ico">
-                    </div>
-                <?php endforeach; ?>
+                // セルのHTMLを出力
+                echo '<div class="cell ' . $class . '" id="' . $cell_id . '">';
+
+                // armory_posのセルにはarmory画像を埋め込む
+                if (in_array($cell_id, $armory_pos)) {
+                    echo '<div class="aromory-cell" aromory_cell_id="' . htmlspecialchars($cell_id) . '">';
+                    echo '<img src="./root_ico/armory.png" alt="armory_ico">';
+                    echo '</div>';
+                }
+
+                // hospital_posのセルにはhospital画像を埋め込む
+                if (in_array($cell_id, $hospital_pos)) {
+                    echo '<div class="hospital-cell" data-item-id="' . htmlspecialchars($cell_id) . '">';
+                    echo '<img src="./root_ico/hospital.png" alt="hospital_ico">';
+                    echo '</div>';
+                }
+
+                echo '</div>';
+            }
+            ?>
 
             </div>
 
@@ -338,8 +297,8 @@ $dangerCellsJson = json_encode($dangerCells);
         //すべてのセルを取得
         const cells = document.querySelectorAll('.cell');
 
-	 // 取得した危険なエリアに基づいてオレンジ斜線に変更
-     cells.forEach(cell => {
+        // 取得した危険なエリアに基づいてオレンジ斜線に変更
+        cells.forEach(cell => {
             if (dangerCells.includes(cell.id)) {
                 cell.style.background = 'orange';
             }

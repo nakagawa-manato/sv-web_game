@@ -29,7 +29,7 @@ $stmt->execute(array($room_id));
 $is_game = $stmt->fetch();
 
 if($is_game['is_game'] == 1) {
-    header('Location:item.php');
+    header('Location: client_sub.php');
 }
 
 header("Refresh:1");

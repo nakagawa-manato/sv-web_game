@@ -38,6 +38,6 @@ $playerPos = $randomX . $randomY;
 $stmt = $db->prepare('UPDATE player SET pos = ? WHERE pl_id = ?');
 $stmt->execute(array($playerPos, $pl_id));
 
-header('Location: canvas.php');
+header('Location: host_main.php');
 exit;
 ?>
