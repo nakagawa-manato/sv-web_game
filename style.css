@@ -65,6 +65,11 @@ body {
     /* プレイヤーがいるセルの色 */
 }
 
+.cell.coverhighlight {
+    background-color:  yellow !important;
+    /* プレイヤーがいるセルの色 */
+}
+
 /* 危険エリアの赤色設定*/
 .cell.danger {
     background-color: red !important;

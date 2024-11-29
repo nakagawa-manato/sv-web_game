@@ -15,6 +15,7 @@ $room = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$room) {
     echo "部屋が見つかりませんでした。";
+    header('Location: room.php');
     exit;
 }
 
@@ -58,10 +59,9 @@ header("Refresh:1");
     <?php endif; ?>
 
     <!-- キャンセルボタン -->
-    <form action="cancel_room.php" method="POST">
-        <input type="hidden" name="room_id" value="<?php echo $room_id; ?>">
-        <button type="submit" name="action" value="cancel">キャンセル</button>
-    </form>
+    <form action="cancel.php" method="get">
+	<input type="submit" value="キャンセル">
+</form>
 </body>
 
 </html>

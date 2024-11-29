@@ -23,8 +23,6 @@ $stmt = $db->prepare('SELECT pl_name FROM player WHERE room_id = ?');
 $stmt->execute(array($room_id));
 $players = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-var_dump($room_id);
-var_dump($players);
 ?>
 
 <!DOCTYPE html>
@@ -57,10 +55,8 @@ var_dump($players);
     </form>
 
     <!-- キャンセルボタン -->
-    <form action="cancel_room.php" method="POST">
-        <input type="hidden" name="room_id" value="<?php echo $room_id; ?>">
-        <button type="submit" name="action" value="cancel">キャンセル</button>
-    </form>
+    <form action="cancel.php" method="get">
+	<input type="submit" value="キャンセル">
 </body>
 
 </html>

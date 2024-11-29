@@ -3,27 +3,34 @@ session_start();
 require('../../../conf/dbconnect.php');
 
 date_default_timezone_set('Asia/Tokyo');
-$time = date("H:i:s");
+$time_now = date("s");
 
-echo $time;
-
+echo $time_now;
 
 //プレイヤーidをセッションから取得
 $pl_id = $_SESSION['id'] ?? null;
 
-var_dump($pl_id);
+// room_idを取得
+$stmt = $db->prepare('SELECT room_id FROM player WHERE pl_id = ?');
+$stmt->execute(array($pl_id));
+$room_id = $stmt->fetch();
 
+// 時間を取得
+$stmt = $db->prepare('SELECT timer FROM timer WHERE room_id = ?');
+$stmt->execute(array($room_id['room_id']));
+$timer = $stmt->fetch();
 
-//デバッグ
-//var_dump($playerPos);
+var_dump($timer);
+
+//バックグラウンドで時間を管理(仮)
+$cmd = 'nohup php timer.php ' . $timer .'> /dev/null &';
+exec($cmd);
 
 //プレイヤー座標を取得
 $pl_pos = $db->prepare('SELECT pos FROM player WHERE pl_id = ?');
 $pl_pos->execute(array($pl_id));
 $playerPos = $pl_pos->fetch(); //プレイヤーの座標
 $playerPos = $playerPos['pos'];
-
-//var_dump($playerPos);
 
 if ($pl_id !== null) {
     //プレイヤーごとのテキストファイルパスを設定
@@ -53,8 +60,8 @@ try {
 
 try {
     //armory_posの情報を取得
-    $stmt = $db->prepare('SELECT armory_pos FROM armory');
-    $stmt->execute(array());
+    $stmt = $db->prepare('SELECT armory_pos FROM armory WHERE room_id = ?');
+    $stmt->execute(array($room_id['room_id']));
     $armory_pos = $stmt->fetchALL(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     echo '接続エラー: ' . $e->getMessage();
@@ -62,8 +69,8 @@ try {
 
 try {
     //hos_posの情報を取得
-    $stmt = $db->prepare('SELECT hos_pos FROM hospital');
-    $stmt->execute(array());
+    $stmt = $db->prepare('SELECT hos_pos FROM hospital WHERE room_id = ?');
+    $stmt->execute(array($room_id['room_id']));
     $hospital_pos = $stmt->fetchALL(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     echo '接続エラー: ' . $e->getMessage();
@@ -71,8 +78,8 @@ try {
 
 // 隣接するプレイヤーの位置を取得
 $adjacentPlayers = [];
-$stmt = $db->prepare('SELECT pl_id, pos FROM player WHERE pl_id != ?');
-$stmt->execute([$pl_id]);
+$stmt = $db->prepare('SELECT pl_id, pos FROM player WHERE pl_id != ? AND room_id = ?');
+$stmt->execute(array($pl_id, $room_id['room_id']));
 $players = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 foreach ($players as $player) {
@@ -92,16 +99,16 @@ try {
     $randomY = $rows[array_rand($rows)]; //縦軸をランダムに選択
     $area = $randomX . $randomY;
 
-    $stmt = $db->prepare('INSERT INTO danger (area,num) VALUE (?,0)');
-    $stmt->execute(array($area));
+    $stmt = $db->prepare('INSERT INTO danger (area,num,room_id) VALUE (?, 0, ?)');
+    $stmt->execute(array($area, $room_id['room_id']));
 } catch (PDOException $e) {
     echo '接続エラー: ' . $e->getMessage();
 }
 
 try {
     //登録したdangerエリアをすべて取得
-    $stmt = $db->prepare('SELECT area FROM danger WHERE num = 0');
-    $stmt->execute();
+    $stmt = $db->prepare('SELECT area FROM danger WHERE num = 0 AND room_id = ?');
+    $stmt->execute(array($room_id['room_id']));
     $dangerAreas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     echo '接続エラー:' . $e->getMessage();
@@ -331,17 +338,23 @@ $dangerCellsJson = json_encode($dangerCells);
         //すべてのセルを取得
         const cells = document.querySelectorAll('.cell');
 
-        //プレイヤーがいる座標を黄色に変更
-        document.getElementById(playerPos).classList.add('highlight');
-
-        // 取得した危険なエリアに基づいて赤色に変更
-        cells.forEach(cell => {
+	 // 取得した危険なエリアに基づいてオレンジ斜線に変更
+     cells.forEach(cell => {
             if (dangerCells.includes(cell.id)) {
-                cell.style.background = 'linear-gradient(45deg, orange 25%, transparent 25%) 0 0, linear-gradient(-45deg, orange 25%, transparent 25%) 0 0';
-                cell.style.backgroundSize = '10px 10px'; // 斜線の間隔
-                cell.style.backgroundRepeat = 'repeat'; // 斜線が繰り返される
+                cell.style.background = 'orange';
             }
         });
+
+        // 線形探索法　配列の先頭からしらみつぶしに調べていく
+        for (let i = 0; i < dangerCells.length; i++) {
+            if (dangerCells[i] === playerPos) {
+                document.getElementById(playerPos).classList.add('coverhighlight');
+            }
+        };
+
+
+        //プレイヤーがいる座標を黄色に変更
+        document.getElementById(playerPos).classList.add('highlight');
 
         //すべてのセルにクリック可能な状態を適用
         cells.forEach(cell => {
