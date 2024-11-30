@@ -9,11 +9,16 @@ $stmt = $db->prepare('UPDATE rooms SET is_game = 1 WHERE room_id = ?');
 $stmt->execute(array($room_id));
 
 // 時間の初期設定
-// うまく機能しない 修正できたかな?
-$stmt = $db->prepare('INSERT INTO timer (timer, room_id, round) VALUES (0, ?, 0)');
+$stmt = $db->prepare('INSERT INTO timer (timer, room_id, round) VALUES (0, ?, 1)');
 if (!$stmt->execute(array($room_id))) {
     print_r($stmt->errorInfo());
 }
+
+// プレイヤーの行動回数を0に設定
+$stmt = $db->prepare('INSERT INTO player (move_count) VALUES (0)');
+
+// アンチエリアのカウントを1に設定
+$_SESSION['dangerCount'] = 1;
 
 // armory_pos を登録する
 $armory_positions = [];

@@ -66,7 +66,7 @@ body {
 }
 
 .cell.coverhighlight {
-    background-color:  yellow !important;
+    background-color: yellow !important;
     /* プレイヤーがいるセルの色 */
 }
 
@@ -217,4 +217,29 @@ button#use-item-btn {
     /* クリック時の色 */
     transform: scale(0.95);
     /* クリック時に少し小さくなる */
+}
+
+/* HPバーのスタイル */
+.hp-bar-container {
+    width: 100%;
+    background-color: #e0e0e0;
+    border-radius: 10px;
+    overflow: hidden;
+    height: 30px;
+    /* バーの高さ */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.hp-bar {
+    height: 100%;
+    width: 0;
+    /* 初期状態は0 */
+    background-color: #4caf50;
+    /* 緑色 (HPがあるとき) */
+    text-align: center;
+    color: white;
+    line-height: 30px;
+    /* バー内のテキスト中央揃え */
+    font-weight: bold;
+    border-radius: 10px 0 0 10px;
 }

@@ -11,7 +11,7 @@ $stmt->execute(array($pl_id));
 $room = $stmt->fetch();
 $room_id = $room['room_id'];
 
-// 初期のタイマー値を取得
+// タイマー値を取得
 $stmt = $db->prepare('SELECT timer FROM timer WHERE room_id = ?');
 $stmt->execute(array($room_id));
 $timer_row = $stmt->fetch();

@@ -4,6 +4,7 @@ require('../../../conf/dbconnect.php');
 
 //プレイヤーidをセッションから取得
 $pl_id = $_SESSION['id'] ?? null;
+$deadCount = $_SESSION['dangerCount'] ?? null;
 
 // room_idを取得
 $stmt = $db->prepare('SELECT room_id FROM player WHERE pl_id = ?');
@@ -11,16 +12,10 @@ $stmt->execute(array($pl_id));
 $room = $stmt->fetch();
 $room_id = $room['room_id'];
 
-// 初期のタイマー値を取得
+// タイマー値を取得
 $stmt = $db->prepare('SELECT timer FROM timer WHERE room_id = ?');
 $stmt->execute(array($room_id));
 $timer_row = $stmt->fetch();
-
-if (isset($timer_row)) {
-    $timer = $timer_row;
-} else {
-    $timer = $timer_row ? $timer_row['timer'] : 0;  // 初期値として0を設定
-}
 
 //以下だとbreakeしてないから以降のコードが実行されない
 /*
@@ -47,11 +42,48 @@ $cmd = 'nohup php timer.php ' . $timer . ' > /dev/null &';
 exec($cmd);
 */
 
-//AJAX
 // タイマーを1秒ごとに更新
-$timer++;
+$timer = $timer_row['timer'] + 1;  // 1秒追加
 $stmt = $db->prepare('UPDATE timer SET timer = ? WHERE room_id = ?');
 $stmt->execute(array($timer, $room_id));
+
+// ラウンド数
+try {
+    $stmt = $db->prepare('SELECT round FROM timer WHERE room_id = ?');
+    $stmt->execute(array($room_id));
+    $round = $stmt->fetch();
+    $round = $round['round'];
+} catch (PDOException $e) {
+    echo '接続エラー: ' . $e->getMessage();
+}
+
+// ラウンドを30秒ごとに+1
+if ($timer % 30 == 0) {
+    try {
+        $round++;
+        $stmt = $db->prepare('UPDATE timer SET round = ? WHERE room_id = ?');
+        $stmt->execute(array($round, $room_id));
+    } catch (PDOException $e) {
+        echo '接続エラー: ' . $e->getMessage();
+    }
+}
+
+// 次のラウンドまでの秒数
+$next_round_time = ceil($timer / 30) * 30; // 30秒の倍数
+$time_to_next_round = $next_round_time - $timer; // 次のラウンドまでの秒数
+
+// プレイヤーの行動回数取得
+try {
+    $stmt = $db->prepare('SELECT move_count FROM player WHERE pl_id = ?');
+    $stmt->execute(array($pl_id));
+    $moveCount = $stmt->fetch();
+    $moveCount = $moveCount['move_count'];
+} catch (PDOException $e) {
+    echo '接続エラー: ' . $e->getMessage();
+}
+
+// プレイヤーのアイテムの制限
+$buttonState = ($moveCount - 1 == $roud) ? 'enable' : 'disabled';
 
 // セルIDの定義（A1, B1, C1, ...）
 $cell_ids = [];
@@ -113,7 +145,8 @@ try {
 
 // 隣接するプレイヤーの位置を取得
 $adjacentPlayers = [];
-$stmt = $db->prepare('SELECT pl_id, pos FROM player WHERE pl_id != ? AND room_id = ?');
+// 自分ではない,同じ部屋,生きている
+$stmt = $db->prepare('SELECT pl_id, pos FROM player WHERE pl_id != ? AND room_id = ? AND alive = 1');
 $stmt->execute(array($pl_id, $room_id));
 $players = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -125,19 +158,23 @@ foreach ($players as $player) {
 // 攻撃ボタンの表示
 $canAttack = in_array($playerPos, $adjacentPlayers); // 隣接しているプレイヤーがいる場合
 
-try {
-    //dangerエリアを登録
-    $columns = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']; //横軸
-    $rows = [1, 2, 3, 4, 5, 6, 7]; //縦軸
+if ($dangerCount == $round) {
+    try {
+        //dangerエリアを登録
+        $columns = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']; //横軸
+        $rows = [1, 2, 3, 4, 5, 6, 7]; //縦軸
 
-    $randomX = $columns[array_rand($columns)]; //横軸をランダムに選択
-    $randomY = $rows[array_rand($rows)]; //縦軸をランダムに選択
-    $area = $randomX . $randomY;
+        $randomX = $columns[array_rand($columns)]; //横軸をランダムに選択
+        $randomY = $rows[array_rand($rows)]; //縦軸をランダムに選択
+        $area = $randomX . $randomY;
 
-    $stmt = $db->prepare('INSERT INTO danger (area,num,room_id) VALUES (?, 0, ?)');
-    $stmt->execute(array($area, $room_id));
-} catch (PDOException $e) {
-    echo '接続エラー: ' . $e->getMessage();
+        $stmt = $db->prepare('INSERT INTO danger (area,num,room_id) VALUES (?, 0, ?)');
+        $stmt->execute(array($area, $room_id));
+
+        $dangerCount++;
+    } catch (PDOException $e) {
+        echo '接続エラー: ' . $e->getMessage();
+    }
 }
 
 try {
@@ -155,6 +192,52 @@ $dangerCells = array_map(function ($row) {
 }, $dangerAreas);
 $dangerCellsJson = json_encode($dangerCells);
 
+// プレイヤーのhp管理
+try {
+    $stmt = $db->prepare('SELECT pl_hp FROM player WHERE pl_id = ?');
+    $stmt->execute(array($pl_id));
+    $pl_hp = $stmt->fetch();
+} catch (PDOException $e) {
+    echo '接続エラー:' . $e->getMessage();
+}
+
+// プレイヤーのHPを取得
+$current_hp = $pl_hp['pl_hp'] ?? 0; // もしHPが取得できなければ0を設定
+$max_hp = 100; // 最大HP
+
+// HPの割合（進行度）を計算
+$hp_percentage = ($current_hp / $max_hp) * 100;
+
+// 生存者の確認
+try {
+    $stmt = $db->prepare('SELECT pl_id, pl_name FROM player WHERE alive = 1');
+    $stmt->execute();
+    $aleve = $stmt->fetchALL(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    echo '接続エラー:' . $e->getMessage();
+}
+
+// 生存者のカウント
+$aliveCount = count($alive);
+
+// 死者の確認
+try {
+    $stmt = $db->prepare('SELECT pl_id, pl_name FROM player WHERE alive = 0');
+    $stmt->execute();
+    $dead = $stmt->fetchALL(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    echo '接続エラー:' . $e->getMessage();
+}
+
+// 死者のカウント
+$deadCount = count($dead);
+
+// 生存者が残り1名になればゲーム終了
+if ($aliveCount == 1) {
+    header('Location: end_game');
+    exit;
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="ja">
@@ -171,41 +254,69 @@ $dangerCellsJson = json_encode($dangerCells);
 
 <body>
     <div class="cotainer">
+
+        <div class="hp">
+            <!-- HPバーの表示 -->
+            <div class="hp-bar-container">
+                <div class="hp-bar" style="width: <?php echo $hp_percentage; ?>%;">
+                    <?php echo $current_hp . ' / ' . $max_hp; ?>
+                </div>
+            </div>
+        </div>
+
+        <div class="round">
+            <h2><?php echo $round ?>ラウンド</h2>
+        </div>
+
+        <!-- 次のラウンドまでの秒数を表示 -->
+        <div id="next-round-timer" class="timer">
+            次のラウンドまで: <span id="countdown"><?php echo $time_to_next_round; ?></span> 秒
+        </div>
+
+        <div class="aliveCount">
+            <h2>生存者<?php echo ($aliveCount); ?>人</h2>
+        </div>
+
+        <div class="deadCount">
+            <h2>死者<?php echo ($deadCount); ?>人</h2>
+        </div>
+
+
         <form id="cellForm" action="cellform.php" method="POST">
             <input type="hidden" name="cellId" id="cellId">
             <div class="board">
 
-            <?php
-            // 56セルを生成
-            foreach ($cell_ids as $cell_id) {
-                // armory_posに含まれている座標かどうかを確認
-                $armory_class = in_array($cell_id, $armory_pos) ? 'armory_cell' : '';
-                // hospital_posに含まれている座標かどうかを確認
-                $hospital_class = in_array($cell_id, $hospital_pos) ? 'hospital_cell' : '';
-                
-                // armory_cellとhospital_cellのクラスを追加
-                $class = trim($armory_class . ' ' . $hospital_class); // クラス名を結合
+                <?php
+                // 56セルを生成
+                foreach ($cell_ids as $cell_id) {
+                    // armory_posに含まれている座標かどうかを確認
+                    $armory_class = in_array($cell_id, $armory_pos) ? 'armory_cell' : '';
+                    // hospital_posに含まれている座標かどうかを確認
+                    $hospital_class = in_array($cell_id, $hospital_pos) ? 'hospital_cell' : '';
 
-                // セルのHTMLを出力
-                echo '<div class="cell ' . $class . '" id="' . $cell_id . '">';
+                    // armory_cellとhospital_cellのクラスを追加
+                    $class = trim($armory_class . ' ' . $hospital_class); // クラス名を結合
 
-                // armory_posのセルにはarmory画像を埋め込む
-                if (in_array($cell_id, $armory_pos)) {
-                    echo '<div class="aromory-cell" aromory_cell_id="' . htmlspecialchars($cell_id) . '">';
-                    echo '<img src="./root_ico/armory.png" alt="armory_ico">';
+                    // セルのHTMLを出力
+                    echo '<div class="cell ' . $class . '" id="' . $cell_id . '">';
+
+                    // armory_posのセルにはarmory画像を埋め込む
+                    if (in_array($cell_id, $armory_pos)) {
+                        echo '<div class="aromory-cell" aromory_cell_id="' . htmlspecialchars($cell_id) . '">';
+                        echo '<img src="./root_ico/armory.png" alt="armory_ico">';
+                        echo '</div>';
+                    }
+
+                    // hospital_posのセルにはhospital画像を埋め込む
+                    if (in_array($cell_id, $hospital_pos)) {
+                        echo '<div class="hospital-cell" data-item-id="' . htmlspecialchars($cell_id) . '">';
+                        echo '<img src="./root_ico/hospital.png" alt="hospital_ico">';
+                        echo '</div>';
+                    }
+
                     echo '</div>';
                 }
-
-                // hospital_posのセルにはhospital画像を埋め込む
-                if (in_array($cell_id, $hospital_pos)) {
-                    echo '<div class="hospital-cell" data-item-id="' . htmlspecialchars($cell_id) . '">';
-                    echo '<img src="./root_ico/hospital.png" alt="hospital_ico">';
-                    echo '</div>';
-                }
-
-                echo '</div>';
-            }
-            ?>
+                ?>
 
             </div>
 
@@ -279,7 +390,7 @@ $dangerCellsJson = json_encode($dangerCells);
         <!-- 使用するアイテムを確認するポップアップ -->
         <div id="use-item-popup" class="popup" style="display:none;">
             <p>このアイテムを使用しますか？</p>
-            <button id="use-item-btn">使用する</button>
+            <button id="use-item-btn" class="<?= $buttonState; ?>" <?php if ($buttonState == 'disabled') echo 'disabled'; ?>>使用する</button>
             <button id="close-popup-btn">キャンセル</button>
         </div>
 
@@ -293,6 +404,41 @@ $dangerCellsJson = json_encode($dangerCells);
     </div>
 
     <script>
+        // 1秒ごとにタイマーを更新するAJAXリクエスト
+        setInterval(function() {
+            // PHPファイルにリクエストを送る
+            fetch('host_main.php', {
+                    method: 'GET',
+                })
+                .then(response => response.text())
+                .then(data => {
+                    // タイマーの更新結果などをここで扱うことができます
+                    console.log('Timer updated:', data);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }, 1000); // 1秒ごとに実行
+
+        // 次のラウンドまでの秒数
+        let countdown = <?php echo $time_to_next_round; ?>;
+
+        // カウントダウンの処理
+        function updateCountdown() {
+            if (countdown > 0) {
+                countdown--;
+                document.getElementById("countdown").innerText = countdown;
+            } else {
+                // 次のラウンドまでの秒数が0になったら自動で再読み込みまたは別の処理を実行
+                document.getElementById("countdown").innerText = "次のラウンドです！";
+                // 必要に応じてページをリロード
+                // location.reload(); 
+            }
+        }
+
+        // 1秒ごとにカウントダウンを更新
+        setInterval(updateCountdown, 1000);
+
         //PHPからプレイヤーの現在座標を取得
         const playerPos = '<?php echo htmlspecialchars($playerPos); ?>';
 
@@ -383,7 +529,7 @@ $dangerCellsJson = json_encode($dangerCells);
                     selectedItemId = itemId; // 選択されたアイテムIDを保持
 
                     // アイテムIDが6の場合のみポップアップを表示
-                    if (selectedItemId == 6) {
+                    if (selectedItemId) {
                         popup.style.display = 'flex';
                     }
                 });
@@ -394,26 +540,58 @@ $dangerCellsJson = json_encode($dangerCells);
                 popup.style.display = 'none';
             });
 
+            // ボタンが無効ならスタイルを変更してブラックアウト（無効化）
+            if (useItemBtn.disabled) {
+                useItemBtn.style.backgroundColor = 'gray';
+                useItemBtn.style.cursor = 'not-allowed';
+            }
+
             // ポップアップの使用ボタンをクリックしたとき
             useItemBtn.addEventListener('click', () => {
-                if (selectedItemId) {
-                    // アイテムを使用する処理（ここにDB更新や処理を追加する）
-                    alert('包帯を使用しました');
-
-                    //cellfrom.phpにuse_item_idをpostで送信
+                if (!useItemBtn.disabled && selectedItemId) {
+                    switch (selectedItemId) {
+                        case '1':
+                            window.location.href = 'host_attack.php?item_id=' + selectedItemId;
+                            break;
+                        case '2':
+                            window.location.href = 'host_attack.php?item_id=' + selectedItemId;
+                            break;
+                        case '3':
+                            window.location.href = 'host_attack.php?item_id=' + selectedItemId;
+                            break;
+                        case '4':
+                            window.location.href = 'host_attack.php?item_id=' + selectedItemId;
+                            break;
+                        case '5':
+                            window.location.href = 'host_attack.php?item_id=' + selectedItemId;
+                            break;
+                        case '6':
+                            alert('アイテム6を使用しました');
+                            break;
+                        default:
+                            alert('不明なアイテムです');
+                            break;
+                    }
+                    // cellfrom.phpにuse_item_idをPOSTで送信
                     const param = {
                         use_item_id: selectedItemId
                     };
 
                     fetch('cellform.php', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'use_item/json'
-                        }, // jsonを指定
-                        body: JSON.stringify(param) // json形式に変換して添付
-                    })
-                    // 使用したアイテムに対する処理を行う
-                    // 例：アイテムをインベントリから削除、またはDBに更新する
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json' // 正しいContent-Type
+                            },
+                            body: JSON.stringify(param) // JSON形式に変換して添付
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            // 使用したアイテムに対する処理を行う（例：アイテムをインベントリから削除、DBに更新する）
+                            console.log(data); // レスポンスを処理する
+                        })
+                        .catch(error => {
+                            console.error('エラー:', error);
+                        });
 
                     // ポップアップを非表示にする
                     popup.style.display = 'none';
