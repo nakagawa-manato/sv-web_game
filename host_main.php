@@ -83,7 +83,7 @@ try {
 }
 
 // プレイヤーのアイテムの制限
-$buttonState = ($moveCount - 1 == $roud) ? 'enable' : 'disabled';
+$buttonState = ($moveCount + 1 == $roud) ? 'enable' : 'disabled';
 
 // セルIDの定義（A1, B1, C1, ...）
 $cell_ids = [];
@@ -146,7 +146,7 @@ try {
 // 隣接するプレイヤーの位置を取得
 $adjacentPlayers = [];
 // 自分ではない,同じ部屋,生きている
-$stmt = $db->prepare('SELECT pl_id, pos FROM player WHERE pl_id != ? AND room_id = ? AND alive = 1');
+$stmt = $db->prepare('SELECT pl_id, pos, pl_name FROM player WHERE pl_id != ? AND room_id = ? AND alive = 1');
 $stmt->execute(array($pl_id, $room_id));
 $players = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -246,7 +246,7 @@ if ($aliveCount == 1) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta http-equiv="refresh" content="100; URL=http://gameg.s322.xrea.com/s2g3/game/canvas.php">
+    <meta http-equiv="refresh" content="1; URL=http://gameg.s322.xrea.com/s2g3/game/host_main.php">
     <title>タイトル</title>
     <link rel="stylesheet" href="reset.css">
     <link rel="stylesheet" href="style.css">
@@ -282,7 +282,7 @@ if ($aliveCount == 1) {
         </div>
 
 
-        <form id="cellForm" action="cellform.php" method="POST">
+        <form id="cellForm" action="host_move.php" method="POST">
             <input type="hidden" name="cellId" id="cellId">
             <div class="board">
 
@@ -394,12 +394,15 @@ if ($aliveCount == 1) {
             <button id="close-popup-btn">キャンセル</button>
         </div>
 
-        <?php if ($canAttack): ?>
-            <!-- 攻撃ボタンの表示 -->
-            <form action="attack.php" method="POST">
-                <input type="submit" name="attack" value="攻撃" class="attack-button">
-            </form>
-        <?php endif; ?>
+        <!-- 攻撃相手選択のポップアップ -->
+        <div id="attack-popup" class="popup" style="display:none;">
+            <p>誰に攻撃しますか？</p>
+            <select id="attack-target">
+                <!-- プレイヤー名がここに動的に追加 -->
+            </select>
+            <button id="confirm-attack-btn">攻撃する</button>
+            <button id="close-attack-popup-btn">キャンセル</button>
+        </div>
 
     </div>
 
@@ -501,7 +504,7 @@ if ($aliveCount == 1) {
         //すべてのセルにクリック可能な状態を適用
         cells.forEach(cell => {
             const cellId = cell.id;
-            if (adjacentCells.includes(cellId)) {
+            if (moveCount + 1 == round && adjacentCells.includes(cellId)) {
                 cell.classList.add('moveable'); //隣接セルをハイライトして光らせる
                 cell.style.cursor = 'pointer'; //隣接セルを選択可能に
                 cell.addEventListener('click', function() {
@@ -520,6 +523,10 @@ if ($aliveCount == 1) {
             const popup = document.getElementById('use-item-popup');
             const closePopupBtn = document.getElementById('close-popup-btn');
             const useItemBtn = document.getElementById('use-item-btn');
+            const attackPopup = document.getElementById('attack-popup');
+            const attackTargetSelect = document.getElementById('attack-target');
+            const confirmAttackBtn = document.getElementById('confirm-attack-btn');
+            const closeAttackPopupBtn = document.getElementById('close-attack-popup-btn');
             let selectedItemId = null;
 
             // アイテム画像がクリックされたとき
@@ -528,7 +535,7 @@ if ($aliveCount == 1) {
                     const itemId = cell.getAttribute('data-item-id');
                     selectedItemId = itemId; // 選択されたアイテムIDを保持
 
-                    // アイテムIDが6の場合のみポップアップを表示
+                    // ポップアップを表示
                     if (selectedItemId) {
                         popup.style.display = 'flex';
                     }
@@ -551,57 +558,70 @@ if ($aliveCount == 1) {
                 if (!useItemBtn.disabled && selectedItemId) {
                     switch (selectedItemId) {
                         case '1':
-                            window.location.href = 'host_attack.php?item_id=' + selectedItemId;
-                            break;
                         case '2':
-                            window.location.href = 'host_attack.php?item_id=' + selectedItemId;
-                            break;
                         case '3':
-                            window.location.href = 'host_attack.php?item_id=' + selectedItemId;
-                            break;
                         case '4':
-                            window.location.href = 'host_attack.php?item_id=' + selectedItemId;
-                            break;
                         case '5':
-                            window.location.href = 'host_attack.php?item_id=' + selectedItemId;
+                            // アイテムIDが1～5の時に攻撃対象選択ポップアップを表示
+                            attackPopup.style.display = 'flex';
+                            // プレイヤーリストを攻撃対象選択肢に追加
+                            loadAttackTargets();
                             break;
                         case '6':
-                            alert('アイテム6を使用しました');
+                            window.location.href = 'host_attack.php?item_id=' + selectedItemId;
                             break;
                         default:
                             alert('不明なアイテムです');
                             break;
                     }
-                    // cellfrom.phpにuse_item_idをPOSTで送信
-                    const param = {
-                        use_item_id: selectedItemId
-                    };
-
-                    fetch('cellform.php', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json' // 正しいContent-Type
-                            },
-                            body: JSON.stringify(param) // JSON形式に変換して添付
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            // 使用したアイテムに対する処理を行う（例：アイテムをインベントリから削除、DBに更新する）
-                            console.log(data); // レスポンスを処理する
-                        })
-                        .catch(error => {
-                            console.error('エラー:', error);
-                        });
-
                     // ポップアップを非表示にする
                     popup.style.display = 'none';
                 }
+            });
+
+            // 攻撃対象選択肢を読み込み
+            function loadAttackTargets() {
+                // プレイヤー名をPHPから取得してJavaScriptで処理（例: json_encode($players)で渡されたデータ）
+                const players = <?php echo ($players); ?>;
+
+                // 既存の選択肢をクリア
+                attackTargetSelect.innerHTML = '';
+
+                // プレイヤーを攻撃対象として追加
+                players.forEach(player => {
+                    const option = document.createElement('option');
+                    option.value = player.pl_name; // プレイヤー名をvalueとして設定
+                    option.textContent = player.pl_name; // プレイヤー名を表示
+                    attackTargetSelect.appendChild(option); // セレクトボックスに追加
+                });
+            }
+
+            // 攻撃確認ボタンをクリックしたとき
+            confirmAttackBtn.addEventListener('click', () => {
+                const selectedTarget = attackTargetSelect.value; // 選ばれたターゲット
+
+                if (selectedTarget) {
+                    // 攻撃処理を実行
+                    window.location.href = 'host_attack.php?item_id=' + selectedItemId + '&target=' + selectedTarget;
+                } else {
+                    alert('攻撃対象を選択してください');
+                }
+
+                // 攻撃対象ポップアップを非表示にする
+                attackPopup.style.display = 'none';
+            });
+
+            // 攻撃対象ポップアップのキャンセルボタン
+            closeAttackPopupBtn.addEventListener('click', () => {
+                attackPopup.style.display = 'none';
             });
 
             // ポップアップ外のクリックで閉じる
             window.addEventListener('click', (e) => {
                 if (e.target === popup) {
                     popup.style.display = 'none';
+                } else if (e.target === attackPopup) {
+                    attackPopup.style.display = 'none';
                 }
             });
         });
