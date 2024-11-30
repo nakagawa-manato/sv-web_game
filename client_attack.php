@@ -99,7 +99,7 @@ if ($itemId) {
         $stmt->execute(array($move_count, $pl_id));
 
         // 攻撃後、元のページにリダイレクト
-        header("Location: host_main.php");
+        header("Location: client_main.php");
         exit();
     } else {
 
@@ -124,7 +124,7 @@ if ($itemId) {
         $stmt = $db->prepare('UPDATE player SET move_count = ? WHERE pl_id = ?');
         $stmt->execute(array($move_count, $pl_id));
 
-        header("Location: host_main.php");
+        header("Location: client_main.php");
         exit();
     }
 
@@ -171,7 +171,7 @@ if ($itemId) {
         $stmt = $db->prepare('UPDATE player SET move_count = ? WHERE pl_id = ?');
         $stmt->execute(array($move_count, $pl_id));
 
-        header("Location: host_main.php");
+        header("Location: client_main.php");
         exit();
     }
 }
