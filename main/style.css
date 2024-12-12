@@ -241,5 +241,6 @@ button#use-item-btn {
     line-height: 30px;
     /* バー内のテキスト中央揃え */
     font-weight: bold;
+     /* 左端を丸く */
     border-radius: 10px 0 0 10px;
 }

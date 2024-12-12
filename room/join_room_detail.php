@@ -1,6 +1,6 @@
 <?php
 session_start();
-require('../../../conf/dbconnect.php');
+require('../../../../../conf/dbconnect.php');
 
 // セッション
 $pl_id = $_SESSION['id'];
@@ -29,7 +29,7 @@ $stmt->execute(array($room_id));
 $is_game = $stmt->fetch();
 
 if($is_game['is_game'] == 1) {
-    header('Location: client_reserve.php');
+    header('Location: ../client_reserve.php');
 }
 
 header("Refresh:1");

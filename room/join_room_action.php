@@ -1,6 +1,6 @@
 <?php
 session_start();
-require('../../../conf/dbconnect.php');
+require('../../../../conf/dbconnect.php');
 
 // セッション
 $pl_id = $_SESSION['id'];

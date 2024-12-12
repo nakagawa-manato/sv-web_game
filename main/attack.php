@@ -1,6 +1,6 @@
 <?php
 session_start();
-require('../../../conf/dbconnect.php');
+require('../../../../conf/dbconnect.php');
 
 // プレイヤーIDをセッションから取得
 $pl_id = $_SESSION['id'] ?? null;
@@ -78,8 +78,13 @@ if ($itemId) {
         }
 
         // 相手のログに記録
-        $filePath = "pl_log/player_" . $attackedPlayerId . ".txt";
-        $content = "プレイヤー名:" . $playerName . " に攻撃されました。HPは-" . $dmg . "\n";
+        if ($newHp == 0) {
+            $filePath = "pl_log/player_" . $attackedPlayerId . ".txt";
+            $content = "プレイヤー名:" . $playerName . " に倒されました\n";    
+        } else {
+            $filePath = "pl_log/player_" . $attackedPlayerId . ".txt";
+            $content = "プレイヤー名:" . $playerName . " に攻撃されました。HPは-" . $dmg . "\n";    
+        }
 
         $fileHandle = fopen($filePath, 'a');
         if ($fileHandle) {
@@ -99,7 +104,7 @@ if ($itemId) {
         $stmt->execute(array($move_count, $pl_id));
 
         // 攻撃後、元のページにリダイレクト
-        header("Location: host_main.php");
+        header("Location: client_main.php");
         exit();
     } else {
 
@@ -124,7 +129,7 @@ if ($itemId) {
         $stmt = $db->prepare('UPDATE player SET move_count = ? WHERE pl_id = ?');
         $stmt->execute(array($move_count, $pl_id));
 
-        header("Location: host_main.php");
+        header("Location: client_main.php");
         exit();
     }
 
@@ -171,7 +176,7 @@ if ($itemId) {
         $stmt = $db->prepare('UPDATE player SET move_count = ? WHERE pl_id = ?');
         $stmt->execute(array($move_count, $pl_id));
 
-        header("Location: host_main.php");
+        header("Location: client_main.php");
         exit();
     }
 }

@@ -1,6 +1,6 @@
 <?php
 session_start();
-require('../../../conf/dbconnect.php');
+require('../../../../conf/dbconnect.php');
 
 // セッション
 $pl_id = $_SESSION['id'];
@@ -18,7 +18,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $stmt->execute(array($room_name));
     $room_id = $stmt->fetch();
 
-    var_dump($room_id);
+    // プレイヤーのroom_idにroom_idを挿入
+    $stmt = $db->prepare('UPDATE player SET room_id = ? WHERE pl_id = ?');
+    $stmt->execute(array($room_id['room_id'], $pl_id));
 
     // 部屋作成後にリダイレクト
     header('Location: create_room_detail.php?room_id=' . $room_id['room_id']);
