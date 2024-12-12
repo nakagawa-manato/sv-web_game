@@ -1,6 +1,6 @@
 <?php
 session_start();
-require('../../../conf/dbconnect.php');
+require('../../../../conf/dbconnect.php');
 
 // セッション
 $pl_id = $_SESSION['id'];
@@ -9,8 +9,6 @@ $pl_id = $_SESSION['id'];
 $stmt = $db->prepare('SELECT * FROM rooms');
 $stmt->execute(array());
 $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-var_dump($result);
 
 ?>
 

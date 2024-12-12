@@ -1,6 +1,6 @@
 <?php
 session_start();
-require('../../../conf/dbconnect.php');
+require('../../../../conf/dbconnect.php');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // POSTデータからcellIdを取得
@@ -61,6 +61,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->execute(array($move_count, $pl_id));
 
     // 処理が終わったら元のHTMLにリダイレクト
-    header("Location:host_main.php");
+    header("Location:main.php");
     exit(); // スクリプトを終了
 }

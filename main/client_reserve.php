@@ -1,9 +1,18 @@
 <?php
 session_start();
-require('../../../conf/dbconnect.php');
+require('../../../../conf/dbconnect.php');
 
-// セッション
-$pl_id = $_SESSION['id'];
+//プレイヤーidをセッションから取得
+$pl_id = $_SESSION['id'] ?? null;
+$room_id = $_POST['room_id'];
+
+// プレイヤーを生存判定にする
+$stmt = $db->prepare('UPDATE player SET alive = 1 WHERE pl_id = ?');
+$stmt->execute(array($pl_id));
+
+// プレイヤーの行動回数を0に設定
+$stmt = $db->prepare('INSERT INTO player (move_count) VALUES (0) WHERE pl_id = ?');
+$stmt->execute(array($pl_id));
 
 // ゲーム開始時に武器をランダムで配布する
 $rand_item_id = ['1', '2', '3', '4'];
@@ -31,6 +40,6 @@ $playerPos = $randomX . $randomY;
 $stmt = $db->prepare('UPDATE player SET pos = ? WHERE pl_id = ?');
 $stmt->execute(array($playerPos, $pl_id));
 
-header('Location: host_main.php');
+header('Location: client_main.php');
 exit;
 ?>

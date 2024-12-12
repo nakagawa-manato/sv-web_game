@@ -1,10 +1,14 @@
 <?php
 session_start();
-require('../../../conf/dbconnect.php');
+require('../../../../conf/dbconnect.php');
 
 //プレイヤーidをセッションから取得
 $pl_id = $_SESSION['id'] ?? null;
-$deadCount = $_SESSION['dangerCount'] ?? null;
+
+// ownerを取得
+$stmt = $db->prepare('SELECT pl_id FROM rooms WHERE room_id = ?');
+$stmt->execute(array($room_id));
+$owner_id = $stmt->fetch();
 
 // room_idを取得
 $stmt = $db->prepare('SELECT room_id FROM player WHERE pl_id = ?');
@@ -12,78 +16,20 @@ $stmt->execute(array($pl_id));
 $room = $stmt->fetch();
 $room_id = $room['room_id'];
 
-// タイマー値を取得
-$stmt = $db->prepare('SELECT timer FROM timer WHERE room_id = ?');
+// ラウンド数を取得
+$stmt = $db->prepare('SELECT round FROM timer WHERE room_id = ?');
 $stmt->execute(array($room_id));
-$timer_row = $stmt->fetch();
-
-//以下だとbreakeしてないから以降のコードが実行されない
-/*
-// 1秒ごとにタイマーを更新する処理
-set_time_limit(0);  // タイムアウト制限を解除 (必要に応じて使用)
-
-while (true) {
-    // タイマーを更新
-    $timer++;
-
-    // データベースに更新
-    $stmt = $db->prepare('UPDATE timer SET timer = ? WHERE room_id = ?');
-    $stmt->execute(array($timer, $room_id));
-
-    // 1秒待機
-    sleep(1);
-}
-*/
-
-//試してない(timer.php)
-// バックグラウンドでタイマー更新スクリプトを実行
-/*
-$cmd = 'nohup php timer.php ' . $timer . ' > /dev/null &';
-exec($cmd);
-*/
-
-// タイマーを1秒ごとに更新
-$timer = $timer_row['timer'] + 1;  // 1秒追加
-$stmt = $db->prepare('UPDATE timer SET timer = ? WHERE room_id = ?');
-$stmt->execute(array($timer, $room_id));
-
-// ラウンド数
-try {
-    $stmt = $db->prepare('SELECT round FROM timer WHERE room_id = ?');
-    $stmt->execute(array($room_id));
-    $round = $stmt->fetch();
-    $round = $round['round'];
-} catch (PDOException $e) {
-    echo '接続エラー: ' . $e->getMessage();
-}
-
-// ラウンドを30秒ごとに+1
-if ($timer % 30 == 0) {
-    try {
-        $round++;
-        $stmt = $db->prepare('UPDATE timer SET round = ? WHERE room_id = ?');
-        $stmt->execute(array($round, $room_id));
-    } catch (PDOException $e) {
-        echo '接続エラー: ' . $e->getMessage();
-    }
-}
-
-// 次のラウンドまでの秒数
-$next_round_time = ceil($timer / 30) * 30; // 30秒の倍数
-$time_to_next_round = $next_round_time - $timer; // 次のラウンドまでの秒数
+$round = $stmt->fetch();
+$round = $round['round'];
 
 // プレイヤーの行動回数取得
-try {
-    $stmt = $db->prepare('SELECT move_count FROM player WHERE pl_id = ?');
-    $stmt->execute(array($pl_id));
-    $moveCount = $stmt->fetch();
-    $moveCount = $moveCount['move_count'];
-} catch (PDOException $e) {
-    echo '接続エラー: ' . $e->getMessage();
-}
+$stmt = $db->prepare('SELECT move_count FROM player WHERE pl_id = ?');
+$stmt->execute(array($pl_id));
+$moveCount = $stmt->fetch();
+$moveCount = $moveCount['move_count'];
 
 // プレイヤーのアイテムの制限
-$buttonState = ($moveCount + 1 == $roud) ? 'enable' : 'disabled';
+$buttonState = ($moveCount + 1 == $round) ? 'enable' : 'disabled';
 
 // セルIDの定義（A1, B1, C1, ...）
 $cell_ids = [];
@@ -115,33 +61,21 @@ if ($pl_id !== null) {
     $fileContent = "プレイヤーIDが不明です";
 }
 
-try {
-    //アイテムの情報を取得
-    $stmt = $db->prepare('SELECT b.item_id, b.amount, i.item_name, i.item_ico FROM backpack b JOIN item i ON b.item_id = i.item_id WHERE b.pl_id = ?');
-    $stmt->execute(array($pl_id));
-    $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    //var_dump($items);
-} catch (PDOException $e) {
-    echo '接続エラー: ' . $e->getMessage();
-}
+//アイテムの情報を取得
+$stmt = $db->prepare('SELECT b.item_id, b.amount, i.item_name, i.item_ico FROM backpack b JOIN item i ON b.item_id = i.item_id WHERE b.pl_id = ?');
+$stmt->execute(array($pl_id));
+$items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+//var_dump($items);
 
-try {
-    //armory_posの情報を取得
-    $stmt = $db->prepare('SELECT armory_pos FROM armory WHERE room_id = ?');
-    $stmt->execute(array($room_id));
-    $armory_pos = $stmt->fetchALL(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    echo '接続エラー: ' . $e->getMessage();
-}
+//armory_posの情報を取得
+$stmt = $db->prepare('SELECT armory_pos FROM armory WHERE room_id = ?');
+$stmt->execute(array($room_id));
+$armory_pos = $stmt->fetchALL(PDO::FETCH_ASSOC);
 
-try {
-    //hos_posの情報を取得
-    $stmt = $db->prepare('SELECT hos_pos FROM hospital WHERE room_id = ?');
-    $stmt->execute(array($room_id));
-    $hospital_pos = $stmt->fetchALL(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    echo '接続エラー: ' . $e->getMessage();
-}
+//hos_posの情報を取得
+$stmt = $db->prepare('SELECT hos_pos FROM hospital WHERE room_id = ?');
+$stmt->execute(array($room_id));
+$hospital_pos = $stmt->fetchALL(PDO::FETCH_ASSOC);
 
 // 隣接するプレイヤーの位置を取得
 $adjacentPlayers = [];
@@ -158,33 +92,10 @@ foreach ($players as $player) {
 // 攻撃ボタンの表示
 $canAttack = in_array($playerPos, $adjacentPlayers); // 隣接しているプレイヤーがいる場合
 
-if ($dangerCount == $round) {
-    try {
-        //dangerエリアを登録
-        $columns = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']; //横軸
-        $rows = [1, 2, 3, 4, 5, 6, 7]; //縦軸
-
-        $randomX = $columns[array_rand($columns)]; //横軸をランダムに選択
-        $randomY = $rows[array_rand($rows)]; //縦軸をランダムに選択
-        $area = $randomX . $randomY;
-
-        $stmt = $db->prepare('INSERT INTO danger (area,num,room_id) VALUES (?, 0, ?)');
-        $stmt->execute(array($area, $room_id));
-
-        $dangerCount++;
-    } catch (PDOException $e) {
-        echo '接続エラー: ' . $e->getMessage();
-    }
-}
-
-try {
-    //登録したdangerエリアをすべて取得
-    $stmt = $db->prepare('SELECT area FROM danger WHERE num = 0 AND room_id = ?');
-    $stmt->execute(array($room_id));
-    $dangerAreas = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    echo '接続エラー:' . $e->getMessage();
-}
+//登録したdangerエリアをすべて取得
+$stmt = $db->prepare('SELECT area FROM danger WHERE num = 0 AND room_id = ?');
+$stmt->execute(array($room_id));
+$dangerAreas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // 取得したエリアをJavaScript用に整形
 $dangerCells = array_map(function ($row) {
@@ -192,14 +103,30 @@ $dangerCells = array_map(function ($row) {
 }, $dangerAreas);
 $dangerCellsJson = json_encode($dangerCells);
 
-// プレイヤーのhp管理
-try {
-    $stmt = $db->prepare('SELECT pl_hp FROM player WHERE pl_id = ?');
-    $stmt->execute(array($pl_id));
-    $pl_hp = $stmt->fetch();
-} catch (PDOException $e) {
-    echo '接続エラー:' . $e->getMessage();
+$stmt = $db->prepare('SELECT count FROM danger WHERE room_id = ?');
+$stmt->execute(array($room_id));
+$dangerCount = $stmt->fetch();
+
+if ($dangerCount  == $round && $pl_id = $owner_id['pl_id']) {
+    //予測dangerエリアを登録
+    $columns = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']; //横軸
+    $rows = [1, 2, 3, 4, 5, 6, 7]; //縦軸
+
+    $randomX = $columns[array_rand($columns)]; //横軸をランダムに選択
+    $randomY = $rows[array_rand($rows)]; //縦軸をランダムに選択
+    $area = $randomX . $randomY;
+
+    $stmt = $db->prepare('INSERT INTO danger (area,num,room_id) VALUES (?, 0, ?)');
+    $stmt->execute(array($area, $room_id));
+
+    $dangerCount++;
+    $_SESSION['dangerCount'] = $dangerCount;
 }
+
+// プレイヤーのhp管理
+$stmt = $db->prepare('SELECT pl_hp FROM player WHERE pl_id = ?');
+$stmt->execute(array($pl_id));
+$pl_hp = $stmt->fetch();
 
 // プレイヤーのHPを取得
 $current_hp = $pl_hp['pl_hp'] ?? 0; // もしHPが取得できなければ0を設定
@@ -209,34 +136,42 @@ $max_hp = 100; // 最大HP
 $hp_percentage = ($current_hp / $max_hp) * 100;
 
 // 生存者の確認
-try {
-    $stmt = $db->prepare('SELECT pl_id, pl_name FROM player WHERE alive = 1');
-    $stmt->execute();
-    $aleve = $stmt->fetchALL(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    echo '接続エラー:' . $e->getMessage();
-}
+$stmt = $db->prepare('SELECT pl_id, pl_name FROM player WHERE alive = 1 AND room_id = ?');
+$stmt->execute(array($room_id));
+$alive = $stmt->fetchALL(PDO::FETCH_ASSOC);
 
 // 生存者のカウント
 $aliveCount = count($alive);
 
 // 死者の確認
-try {
-    $stmt = $db->prepare('SELECT pl_id, pl_name FROM player WHERE alive = 0');
-    $stmt->execute();
-    $dead = $stmt->fetchALL(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    echo '接続エラー:' . $e->getMessage();
-}
+$stmt = $db->prepare('SELECT pl_id, pl_name FROM player WHERE alive = 0 AND room_id = ?');
+$stmt->execute(array($room_id));
+$dead = $stmt->fetchALL(PDO::FETCH_ASSOC);
 
 // 死者のカウント
 $deadCount = count($dead);
 
 // 生存者が残り1名になればゲーム終了
+/*
 if ($aliveCount == 1) {
     header('Location: end_game');
     exit;
 }
+
+// 現在のランキング
+$rank = $deadCount + 1;
+
+// hpが0になれば観戦に移動
+if ($pl_hp['pl_hp'] == 0) {
+
+    // ランキング登録
+    $stmt = $db->prepare('INSERT INTO player (ranking) VALUES (?)');
+    $stmt->execute(array($rank));
+
+    header('Location: spectator.php');
+    exit;
+}
+*/
 
 ?>
 <!DOCTYPE html>
@@ -246,7 +181,7 @@ if ($aliveCount == 1) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta http-equiv="refresh" content="1; URL=http://gameg.s322.xrea.com/s2g3/game/host_main.php">
+    <meta http-equiv="refresh" content="1; URL=http://gameg.s322.xrea.com/s2g3/game/main.php">
     <title>タイトル</title>
     <link rel="stylesheet" href="reset.css">
     <link rel="stylesheet" href="style.css">
@@ -282,7 +217,7 @@ if ($aliveCount == 1) {
         </div>
 
 
-        <form id="cellForm" action="host_move.php" method="POST">
+        <form id="cellForm" action="move.php" method="POST">
             <input type="hidden" name="cellId" id="cellId">
             <div class="board">
 
@@ -407,40 +342,24 @@ if ($aliveCount == 1) {
     </div>
 
     <script>
-        // 1秒ごとにタイマーを更新するAJAXリクエスト
-        setInterval(function() {
-            // PHPファイルにリクエストを送る
-            fetch('host_main.php', {
-                    method: 'GET',
-                })
-                .then(response => response.text())
-                .then(data => {
-                    // タイマーの更新結果などをここで扱うことができます
-                    console.log('Timer updated:', data);
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                });
-        }, 1000); // 1秒ごとに実行
+        document.addEventListener('DOMContentLoaded', e => {
+            const es = new EventSource('./events.php');
+            es.addEventListener('message', e => {
+                const {
+                    time
+                } = JSON.parse(e.data);
 
-        // 次のラウンドまでの秒数
-        let countdown = <?php echo $time_to_next_round; ?>;
+                // next_round_timeを計算
+                const next_round_time = time / 30;
 
-        // カウントダウンの処理
-        function updateCountdown() {
-            if (countdown > 0) {
-                countdown--;
-                document.getElementById("countdown").innerText = countdown;
-            } else {
-                // 次のラウンドまでの秒数が0になったら自動で再読み込みまたは別の処理を実行
-                document.getElementById("countdown").innerText = "次のラウンドです！";
-                // 必要に応じてページをリロード
-                // location.reload(); 
-            }
-        }
+                // time_to_next_roundを計算
+                const time_to_next_round = 30 - next_round_time;
 
-        // 1秒ごとにカウントダウンを更新
-        setInterval(updateCountdown, 1000);
+                // 結果をnext-round-timerに表示
+                document.getElementById('next-round-timer').textContent =
+                    `Next Round Time: ${next_round_time}, Time to Next Round: ${time_to_next_round}`;
+            });
+        });
 
         //PHPからプレイヤーの現在座標を取得
         const playerPos = '<?php echo htmlspecialchars($playerPos); ?>';
@@ -479,7 +398,6 @@ if ($aliveCount == 1) {
             }
         });
 
-
         //すべてのセルを取得
         const cells = document.querySelectorAll('.cell');
 
@@ -496,7 +414,6 @@ if ($aliveCount == 1) {
                 document.getElementById(playerPos).classList.add('coverhighlight');
             }
         };
-
 
         //プレイヤーがいる座標を黄色に変更
         document.getElementById(playerPos).classList.add('highlight');
@@ -568,7 +485,7 @@ if ($aliveCount == 1) {
                             loadAttackTargets();
                             break;
                         case '6':
-                            window.location.href = 'host_attack.php?item_id=' + selectedItemId;
+                            window.location.href = 'attack.php?item_id=' + selectedItemId;
                             break;
                         default:
                             alert('不明なアイテムです');
@@ -602,7 +519,7 @@ if ($aliveCount == 1) {
 
                 if (selectedTarget) {
                     // 攻撃処理を実行
-                    window.location.href = 'host_attack.php?item_id=' + selectedItemId + '&target=' + selectedTarget;
+                    window.location.href = 'attack.php?item_id=' + selectedItemId + '&target=' + selectedTarget;
                 } else {
                     alert('攻撃対象を選択してください');
                 }

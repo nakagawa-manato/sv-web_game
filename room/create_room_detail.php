@@ -1,6 +1,6 @@
 <?php
 session_start();
-require('../../../conf/dbconnect.php');
+require('../../../../conf/dbconnect.php');
 
 // セッション
 $pl_id = $_SESSION['id'];
@@ -49,7 +49,7 @@ $players = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <?php endif; ?>
 
     <!-- スタートボタン -->
-    <form action="start_reserve.php" method="POST">
+    <form action="../host_reserve.php" method="POST">
         <input type="hidden" name="room_id" value="<?php echo $room_id; ?>">
         <button type="submit" name="action" value="start">スタート</button>
     </form>
